@@ -37,11 +37,13 @@
           hindsightApi = pkgs.callPackage ./nix/hindsight-api.nix {
             inherit (inputs) uv2nix pyproject-nix pyproject-build-systems;
           };
+          hindsightControlPlane = pkgs.callPackage ./nix/hindsight-control-plane.nix { };
         in
         {
           packages = {
             default = hindsightApi;
             hindsight-api = hindsightApi;
+            hindsight-control-plane = hindsightControlPlane;
           };
         };
     };
