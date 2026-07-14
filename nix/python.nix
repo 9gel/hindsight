@@ -25,6 +25,25 @@ let
     sourcePreference = "wheel";
   };
 
+  # mlx is an optional Apple-Silicon reranker backend (the `jina-mlx` code path
+  # in hindsight_api.engine.jina_mlx_reranker), imported lazily and only when
+  # that backend is explicitly selected.  The `local-ml` extra pulls it in with
+  # the marker `sys_platform != 'win32'`, so it lands on Linux too — but the
+  # Linux mlx wheel ships only `core.so` with a dangling `libmlx.so` reference
+  # (the actual backend, mlx-metal, is darwin-only and has no Linux counterpart
+  # in the lock).  auto-patchelf therefore hard-fails the wheel on Linux.
+  #
+  # Since the import is lazy and unused unless the jina-mlx reranker is chosen,
+  # let the wheel install with the dangling ref on Linux instead of failing the
+  # whole venv.  No-op on darwin, where mlx-metal satisfies libmlx.so normally.
+  mlxLinuxFixup = final: prev:
+    lib.optionalAttrs stdenv.hostPlatform.isLinux {
+      mlx = prev.mlx.overrideAttrs (old: {
+        autoPatchelfIgnoreMissingDeps =
+          (old.autoPatchelfIgnoreMissingDeps or [ ]) ++ [ "libmlx.so" ];
+      });
+    };
+
   pythonSet =
     (callPackage pyproject-nix.build.packages {
       python = python312;
@@ -32,6 +51,7 @@ let
       (lib.composeManyExtensions [
         pyproject-build-systems.overlays.default
         overlay
+        mlxLinuxFixup
       ]);
 in
 # Empty list = just hindsight-api's main `[project.dependencies]`, no extras,
